@@ -1,7 +1,6 @@
-/**
- * @license none
+/** @license
  * @author <a href="mailto:i@perichr.org">perichr</a>
- * @version 1.0.0.1
+ * @version 1.0.0.3
  * @link http://perichr.org
  */
 (function(root, doc, perichr, undefined) {
@@ -132,35 +131,42 @@
 				return
 			}
 			src = Trim(src)
-			if (_script_cache_[src]) return
-			_script_cache_[src] = s
+			if (src.indexOf('http://') != 0) {
+				src = _options_.perichr_js_url + '/../' + src
+			}
+			if (_script_cache_[src]){
+				if(/[\?&]callback=/.test(src)) return
+			} else{
+				_script_cache_[src] = s
+			}
 			setTimeout(function() {
 				var script = doc.createElement('script')
-				script.id = GetScriptId(src)
-				if (src.indexOf('http://') != 0) {
-					src = _options_.perichr_js_url + '/../' + src
-				}
 				script.src = src
 				script.onload = script.onreadystatechange = function() {
-						if (!script.readyState || /loaded|complete/.test(script.readyState)) {
-							script.onload = script.onreadystatechange = null
-							if (remove) script.parentNode.removeChild(script)
-							s.ready = true
-							run_callback()
+					if (!script.readyState || /loaded|complete/.test(script.readyState)) {
+						script.onload = script.onreadystatechange = null
+						s.ready = true
+						run_callback()
+						if (remove) {
+							setTimeout(function(){
+								if(script.parentNode)script.parentNode.removeChild(script)
+							}, 500)
 						}
 					}
+				}
 				doc.body.appendChild(script)
 			}, 0)
 		},
-		
-		Jsonp = _fn_.jsonp = F.Jsonp = function(src, cb) {
-			var cbname = Seed('cb')
-			src += ((/\?/).test(src) ? '&' : '?') + 'callback=' + cbname;
-			root[cbname] = function(data) {
-				cb(data)
+		Jsonp = _fn_.jsonp = F.Jsonp = function(options) {
+			options.data = options.data || {}
+			options.data._ = (new Date).valueOf()
+			options.data.callback = options.data.callback || Seed('cb')
+			options.url += ((/\?/).test(options.url) ? '&' : '?') + Serialize(options.data)
+			root[options.data.callback] = function(data) {
+				options.success && options.success(data)
 			}
-			Js(src, function() {
-				delete root[cbname]
+			Js(options.url, function() {
+				delete root[options.data.callback]
 			}, true)
 		},
 
@@ -192,7 +198,7 @@
 							type = typeof item
 						switch (type) {
 						case ('string'):
-							Js(item, cb)
+							Js(item, cb, true)
 							break
 						case ('function'):
 							item()
@@ -332,7 +338,7 @@
 		 */
 		Serialize = _fn_.serialize = F.Serialize = function(object) {
 			var retval = [];
-			for (key in object) key = [key, object[key]].join('='), retval.push(key)
+			for (var key in object) key = [key, object[key]].join('='), retval.push(key)
 			return retval.join('&')
 		},
 
@@ -344,8 +350,6 @@
 		 */
 		Lo = P.Load = function(plugin) {
 			if (plugin) {
-				var script = Id(GetScriptId(plugin.id))
-				if (!script) return
 				var key = plugin.id || (Prefix('noname') + Seed()),
 					cache = {
 						FN: {},
@@ -371,8 +375,7 @@
 							}
 						}
 					}
-				plugin.options = cache.OPTIONS = JSON.parse(script.getAttribute('data-options') || '{}')
-				cache.OPTIONS.src = script.src
+				plugin.options = cache.OPTIONS
 				U[key] = plugin
 				plugin.GetPlugin = function(key) {
 					return key ? U[key] : plugin
@@ -388,13 +391,14 @@
 					plugin.fn[name] = func
 				})
 				plugin.Init && plugin.Init(cache.OPTIONS)
-				Rm(script)
+				//Rm(script)
 			} else {
-				var script = Id(GetScriptId())
+				var script = Id(Prefix('js'))
 				if (!script) return
 				var datainit = script.getAttribute('data-init'),
 					dataoptions = script.getAttribute('data-options')
 				_options_.perichr_js_url = script.src
+				_options_.jslib_path = script.src.substring(0,script.src.lastIndexOf('perichr.js'))
 				if (dataoptions) {
 					Extend(_options_, JSON.parse(dataoptions))
 				}
@@ -415,11 +419,6 @@
 	/* 自启动结束 */
 
 	/* 预载的私有函数开始 */
-	function GetScriptId( str ){
-		str = str? str.substring(str.lastIndexOf('/') + 1).replace(/\?|\.|&|=/g,'_') : 'js'
-		return Prefix( str )
-	}
-
 	function Prefix(key) {
 		return perichr + key + '_'
 	}
