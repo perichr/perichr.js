@@ -1,6 +1,6 @@
 /** @license
  * @author <a href="mailto:i@perichr.org">perichr</a>
- * @version 1.0.0.3
+ * @version 1.0.0.4
  * @link http://perichr.org
  */
 (function(root, doc, perichr, undefined) {
@@ -131,8 +131,8 @@
 				return
 			}
 			src = Trim(src)
-			if (src.indexOf('http://') != 0) {
-				src = _options_.perichr_js_url + '/../' + src
+			if ( !/^http:|\//.test(src)) {
+				src = _options_.jslib + src
 			}
 			if (_script_cache_[src]){
 				if(/[\?&]callback=/.test(src)) return
@@ -269,7 +269,7 @@
 			var element = doc.createElement(tag)
 			if (attributes) {
 				Each(attributes, function(key, value) {
-					element.setAttribute(key, value)
+					Attr(element, key, value)
 				})
 			}
 			if (childs && childs.length>0) {
@@ -308,7 +308,71 @@
 			if (parent.lastChild === target) parent.appendChild(element)
 			else parent.insertBefore(element, target.nextSibling)
 		},
+		Txt = _fn_.text = F.ElementText = function(element, text) {
+			if (text === undefined){
+				if ( typeof element.textContent === "string" ) {
+					return element.textContent;
+				} else {
+					var ret = ''
+					for ( element = element.firstChild; element; element = elem.nextSibling ) {
+						ret += Txt( element );
+					}
+					return ret
+				}
+			} else {
+				element.innerHTML = ''
+				Append(element, document.createTextNode(text))
+			}
+		},
+		Attr = _fn_.attribute = F.ElementAttribute = function(element, key, value) {
+			if (value === undefined){
+				return element.getAttribute(key)
+			} else {
+				element.setAttribute(key, value)
+			}
+		},
+		HasC = _fn_.hasclass = F.ContainsClass = function(){
+			return doc.body.classList ? function(element, key){
+				return element.classList.contains(key)
+			} : function(element, key){
+				return Index(key, element.className.split(' ')) > -1
+			}
+		}(),
 
+		AddC = _fn_.addclass = F.AddClass = function(){
+			return doc.body.classList ? function(element, key){
+				element.classList.add(key)
+			} : function(element, key){
+				(Index(key, element.className.split(' ')) == -1) && (element.className += (' ' + key))
+			}
+		}(),
+		RmC = _fn_.rmclass = F.RemoveClass = function(){
+			return doc.body.classList ? function(element, key){
+				element.classList.remove(key)
+			} : function(element, key){
+				var className = element.className.split(' '),
+					index = Index(key, className)
+				if(index > -1){
+					classNames.splice(index, 1)
+					element.className = classNames.join(" ")
+				}
+			}
+		}(),
+		TgC = _fn_.toggleclass = F.ToggleClass = function(){
+			return doc.body.classList ? function(element, key){
+				element.classList.toggle(key)
+			} : function(element, key){
+				var className = element.className.split(' '),
+					index = Index(key, className)
+				if(index > -1){
+					classNames.splice(index, 1)
+					element.className = classNames.join(' ')
+				} else {
+					element.className += ' ' + key
+				}
+			}
+		}(),
+		
 		On = _fn_.on = F.AddEvent = function(element, e, fn, capture) {
 			var add = doc.body.addEventListener ?
 			function() {
@@ -340,6 +404,12 @@
 			var retval = [];
 			for (var key in object) key = [key, object[key]].join('='), retval.push(key)
 			return retval.join('&')
+		},
+
+		Times = _fn_.times = F.Times = function (n, iterator, context) {
+			var accum = Array(Math.max(0, n))
+			for (var i = 0; i < n; i++) accum[i] = iterator.call(context, i)
+			return accum
 		},
 
 
@@ -397,8 +467,7 @@
 				if (!script) return
 				var datainit = script.getAttribute('data-init'),
 					dataoptions = script.getAttribute('data-options')
-				_options_.perichr_js_url = script.src
-				_options_.jslib_path = script.src.substring(0,script.src.lastIndexOf('perichr.js'))
+				_options_.jslib = script.src.replace(/(.+)perichr\.js$/, '$1')
 				if (dataoptions) {
 					Extend(_options_, JSON.parse(dataoptions))
 				}
