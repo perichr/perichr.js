@@ -18,9 +18,8 @@
 		_seed_ = (new Date()).getTime(), // 种子
 		_script_cache_ = {}, //缓存的脚本名（私有）
 		_plugin_cache_ = {}, //插件继承对象
-		_const_ = _plugin_cache_.CONST = {}, //常量库
 		_fn_ = _plugin_cache_.FN = {}, //函数库
-		_options_ = _plugin_cache_.OPTIONS = {}, //配置库
+		_option_ = _plugin_cache_.OPTION = {}, //配置库
 		
 	/* 常用函数开始 */
 		 
@@ -131,9 +130,7 @@
 				return
 			}
 			src = Trim(src)
-			if ( !/^http:|\//.test(src)) {
-				src = _options_.jslib + src
-			}
+			src = GetFullUrl(src, _option_.jslib)
 			if (_script_cache_[src]){
 				if(/[\?&]callback=/.test(src)) return
 			} else{
@@ -414,18 +411,14 @@
 
 
 		/**
-		 * @name _perichr_Load
+		 * @name _perichr_.Load
 		 * @description 载入插件功能
 		 * @param {Object} plugin 插件对象
 		 */
 		Lo = P.Load = function(plugin) {
 			if (plugin) {
 				var key = plugin.id || (Prefix('noname') + Seed()),
-					cache = {
-						FN: {},
-						CONST: {},
-						OPTIONS: {}
-					},
+					cache = {},
 					getter = function(type) {
 						type = type.toLocaleUpperCase()
 						return function(key, b) {
@@ -438,6 +431,7 @@
 						return function(key, value) {
 							key = key.toLocaleLowerCase()
 							if (value === undefined) {
+								
 								return cache[type][key] || _plugin_cache_[type][key]
 							} else {
 								cache[type][key] = value
@@ -445,31 +439,28 @@
 							}
 						}
 					}
-				plugin.options = cache.OPTIONS
 				U[key] = plugin
 				plugin.GetPlugin = function(key) {
 					return key ? U[key] : plugin
 				}
-				plugin.Options = gsetter('options')
-				plugin.GetConst = getter('const')
+				plugin.GetOption = getter('option')
+				plugin.option = cache.OPTION = gsetter('option')
 				plugin.GetFn = getter('fn')
-				plugin.Const = gsetter('const')
-				plugin.fn = gsetter('fn', function(name, func) {
+				plugin.fn = cache.FN =gsetter('fn', function(name, func) {
 					plugin.fn[name] = func || _fn_[name]
 				})
 				Each(_fn_, function(name, func) {
 					plugin.fn[name] = func
 				})
-				plugin.Init && plugin.Init(cache.OPTIONS)
-				//Rm(script)
+				plugin.Init && plugin.Init()
 			} else {
 				var script = Id(Prefix('js'))
 				if (!script) return
 				var datainit = script.getAttribute('data-init'),
 					dataoptions = script.getAttribute('data-options')
-				_options_.jslib = script.src.replace(/(.+)perichr\.js$/, '$1')
+				_option_.jslib = GetFullUrl(script.src.replace(/(.+)perichr\.js$/, '$1')) 
 				if (dataoptions) {
-					Extend(_options_, JSON.parse(dataoptions))
+					Extend(_option_, JSON.parse(dataoptions))
 				}
 				if (datainit) {
 					var i = 0
@@ -490,6 +481,17 @@
 	/* 预载的私有函数开始 */
 	function Prefix(key) {
 		return perichr + key + '_'
+	}
+	function GetFullUrl(url, base) {
+		if(/^(http:\/\/|\/)/.test(url)){
+			return url
+		}
+		if(!base){
+			base = window.location
+			base = base.protocol + '//' + base.host + base.pathname	
+		}
+		url = (base + '/' + url).replace(/([^:])[\/]+/g, '$1/')
+		return url
 	}
 	/* 预载的私有函数结束 */
 
