@@ -152,6 +152,7 @@
                 doc.body.appendChild(script)
             }, 0)
         },
+
         /**
          * @name _perichr_.Functions.Jsonp
          * @description 获取jsonp数据
