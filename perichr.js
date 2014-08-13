@@ -9,7 +9,7 @@
         root[perichr].Load()
         return
     }
-    
+
     /* 初始化开始 */
     var
         P = root[perichr] = {}, //顶级公开对象"_perichr_"
@@ -22,7 +22,7 @@
         _option_ = _plugin_cache_.OPTION = {}, //配置库
         
     /* 常用函数开始 */
-         
+
         /**
          * @name _perichr_.Functions.ForEach
          * @description 循环
