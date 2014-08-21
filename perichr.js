@@ -1,20 +1,24 @@
 /** @license
  * @author <a href="mailto:i@perichr.org">perichr</a>
- * @version 1.0.0.5
+ * @version 1.1
  * @link http://perichr.org
  */
-(function(root, doc, perichr, undefined) {
+
+(function(root, perichr, undefined) {
     'use strict';
     if (root[perichr]) {
-        root[perichr].Load()
+        root[perichr]()
         return
     }
 
     /* 初始化开始 */
     var
-        P = root[perichr] = {}, //顶级公开对象"_perichr_"
+        P = root[perichr] = function(){
+            Lo.apply(null, arguments)
+        },
         F = P.Functions = {}, //函数库（公开）
         U = P.Plugins = {}, //插件库（公开）
+        L = P.LibPath = {}, //脚本库地址集（公开）
         _seed_ = (new Date()).getTime(), // 种子
         _script_cache_ = {}, //缓存的脚本名（私有）
         _plugin_cache_ = {}, //插件继承对象
@@ -22,7 +26,7 @@
         _option_ = _plugin_cache_.OPTION = {}, //配置库
         
     /* 常用函数开始 */
-
+    
         /**
          * @name _perichr_.Functions.ForEach
          * @description 循环
@@ -80,9 +84,8 @@
          * @return {Boolean} result 结果
          */
         Arraify = _fn_.array = F.Arraify = function(object) {
-            var array = []
             try {
-                array = Array.prototype.slice.call(object, 0)
+                var array = Array.prototype.slice.call(object, 0)
             } catch (error) {
                 for (var item, array = [], i = 0; item = object[i++];) array.push(item)
             }
@@ -102,17 +105,31 @@
         },
 
         /**
-         * @name _perichr_.Functions.CreateScript
+         * @name _perichr_.Functions.InsertStyle
          * @description 插入一个脚本链接
          * @param {Stirng} src 脚本地址
          * @param {Function} callback 回调函数
          * @param {Boolean} remove 完成后是否删除脚本dom
          */
-        Js = _fn_.js = F.CreateScript = function(src, callback, remove) {
+        Css = _fn_.css = F.InsertStyle = function(src) {
+            var link = document.createElement('link')
+            link.href = src
+            link.rel = 'stylesheet'
+            document.head.appendChild(link)
+        },
+        /**
+         * @name _perichr_.Functions.InsertScript
+         * @description 插入一个脚本链接
+         * @param {Stirng} src 脚本地址
+         * @param {Function} callback 回调函数
+         * @param {Boolean} remove 完成后是否删除脚本dom
+         */
+        Js = _fn_.js = F.InsertScript = function(src, callback, remove) {
             if (typeof callback == 'boolean') {
                 remove = callback
                 callback = null
             }
+            src = Trim(src)
             var s = _script_cache_[src] || {
                 callback: []
             },
@@ -127,29 +144,26 @@
                 run_callback()
                 return
             }
-            src = Trim(src)
-            src = GetFullUrl(src, _option_.jslib)
-            if (_script_cache_[src]){
-                if(/[\?&]callback=/.test(src)) return
+            if (_script_cache_[src]) {
+                return
             } else{
+                if(/[\?&]callback=/.test(src)) return
                 _script_cache_[src] = s
             }
             setTimeout(function() {
-                var script = doc.createElement('script')
+                var script = document.createElement('script')
                 script.src = src
                 script.onload = script.onreadystatechange = function() {
                     if (!script.readyState || /loaded|complete/.test(script.readyState)) {
                         script.onload = script.onreadystatechange = null
-                        s.ready = true
+                        script.ready = true
                         run_callback()
                         if (remove) {
-                            setTimeout(function(){
-                                if(script.parentNode)script.parentNode.removeChild(script)
-                            }, 500)
                         }
                     }
                 }
-                doc.body.appendChild(script)
+                document.body.appendChild(script)
+                if(script.parentNode)script.parentNode.removeChild(script)
             }, 0)
         },
 
@@ -224,7 +238,7 @@
          * @return {Stirng} result 结果
          */
         Trim = _fn_.trim = F.Trim = function(string) {
-            return string.replace(/^(\s|\u00A0)+/, "").replace(/(\s|\u00A0)+$/, "")
+            return string.replace(/^(\s|\u00A0|\t|\r|\n)+/, "").replace(/(\s|\u00A0|\t|\r|\n)+$/, "")
         },
 
         /**
@@ -243,7 +257,7 @@
          * @return {Stirng} result 结果
          */
         Id = _fn_.id = F.GetElementById = function(id) {
-            return doc.getElementById(id)
+            return document.getElementById(id)
         },
 
         /**
@@ -253,7 +267,7 @@
          * @return {Stirng} result 结果
          */
         Qs = _fn_.qs = F.QuerySelector = function(xpath) {
-            return doc.querySelector(xpath)
+            return document.querySelector(xpath)
         },
 
         /**
@@ -263,7 +277,7 @@
          * @return {Stirng} result 结果
          */
         Qa = _fn_.qa = F.QuerySelectorAll = function(xpath) {
-            return doc.querySelectorAll(xpath)
+            return document.querySelectorAll(xpath)
         },
 
         /**
@@ -275,7 +289,7 @@
          * @return {Element} result 结果
          */
         El = _fn_.element = F.CreateElement = function(tag, attributes, childs) {
-            var element = doc.createElement(tag)
+            var element = document.createElement(tag)
             if (attributes) {
                 Each(attributes, function(key, value) {
                     Attr(element, key, value)
@@ -389,13 +403,16 @@
          * @param {String} key class名
          * @return {Boolean} result
          */
-        HasC = _fn_.hasclass = F.ContainsClass = function(){
-            return doc.body.classList ? function(element, key){
-                return element.classList.contains(key)
-            } : function(element, key){
-                return Index(key, element.className.split(' ')) > -1
-            }
-        }(),
+        HasC = _fn_.hasclass = F.ContainsClass = function(element, key){
+            var bool = true
+            Each(key.split(' '), function(){
+                if(element.classList ? !element.classList.contains(key) : Index(key, element.className.split(' ')) == -1) {
+                    bool = false
+                    return false
+                }
+            })
+            return bool
+        },
 
         /**
          * @name _perichr_.Functions.AddClass
@@ -403,13 +420,15 @@
          * @param {Element} target 目标dom对象
          * @param {String} key class名
          */
-        AddC = _fn_.addclass = F.AddClass = function(){
-            return doc.body.classList ? function(element, key){
-                element.classList.add(key)
-            } : function(element, key){
-                (Index(key, element.className.split(' ')) == -1) && (element.className += (' ' + key))
-            }
-        }(),
+        AddC = _fn_.addclass = F.AddClass = function(element, key){
+            Each(key.split(' '), function(){
+                this && 
+                    element.classList
+                    ? element.classList.add(this)
+                    : ((Index(this, element.className.split(' ')) == -1) && (element.className += (' ' + this)))
+               
+            })
+        },
 
         /**
          * @name _perichr_.Functions.RemoveClass
@@ -417,18 +436,23 @@
          * @param {Element} target 目标dom对象
          * @param {String} key class名
          */
-        RmC = _fn_.rmclass = F.RemoveClass = function(){
-            return doc.body.classList ? function(element, key){
-                element.classList.remove(key)
-            } : function(element, key){
-                var className = element.className.split(' '),
-                    index = Index(key, className)
-                if(index > -1){
-                    classNames.splice(index, 1)
-                    element.className = classNames.join(" ")
+        RmC = _fn_.rmclass = F.RemoveClass = function(element, key){
+            Each(key.split(' '), function(){
+                if(!this){
+                    return
                 }
-            }
-        }(),
+                if(element.classList){
+                    element.classList.remove(this)
+                } else {
+                    var className = element.className.split(' '),
+                        index = Index(this, className)
+                    if(index > -1){
+                        classNames.splice(this, 1)
+                        element.className = classNames.join(" ")
+                    }                
+                }
+            })
+        },
 
         /**
          * @name _perichr_.Functions.ToggleClass
@@ -436,20 +460,25 @@
          * @param {Element} target 目标dom对象
          * @param {String} key class名
          */
-        TgC = _fn_.toggleclass = F.ToggleClass = function(){
-            return doc.body.classList ? function(element, key){
-                element.classList.toggle(key)
-            } : function(element, key){
-                var className = element.className.split(' '),
-                    index = Index(key, className)
-                if(index > -1){
-                    classNames.splice(index, 1)
-                    element.className = classNames.join(' ')
-                } else {
-                    element.className += ' ' + key
+        TgC = _fn_.toggleclass = F.ToggleClass = function() {
+            Each(key.split(' '), function(){
+                if(!this){
+                    return
                 }
-            }
-        }(),
+                if(element.classList){
+                    element.classList.toggle(this)
+                } else {
+                    var className = element.className.split(' '),
+                        index = Index(this, className)
+                    if(index > -1){
+                        classNames.splice(index, 1)
+                        element.className = classNames.join(' ')
+                    } else {
+                        element.className += ' ' + this
+                    }
+                }
+            })
+        },
 
         /**
          * @name _perichr_.Functions.AddEvent
@@ -460,14 +489,9 @@
          * @param {Boolean} capture true为捕获，false为冒泡。
          */
         On = _fn_.on = F.AddEvent = function(element, event, fn, capture) {
-            capture = !! capture
-            var add = doc.body.addEventListener ?
-            function() {
-                this.addEventListener(event, fn, capture)
-            } : function() {
-                this.attachEvent('on' + event, fn)
-            }
-            Each(element, add, true)
+            Each(element, function() {
+                this.addEventListener ? this.addEventListener(event, fn, !!capture) : this.attachEvent('on' + event, fn)
+            }, true)
         },
 
         /**
@@ -480,14 +504,9 @@
          */
 
         Off = _fn_.off = F.RemoveEvent = function(element, event, fn, capture) {
-            capture = !! capture
-            var remove = doc.body.removeEventListener ?
-            function() {
-                this.removeEventListener(event, fn, capture)
-            } : function() {
-                this.detachEvent('on' + event, fn)
-            }
-            Each(element, remove, true)
+            Each(element, function() {
+                element.removeEventListener ? this.removeEventListener(event, fn, !!capture) : this.detachEvent('on' + event, fn)
+            }, true)
         },
 
         /**
@@ -515,69 +534,101 @@
             var accum = Array(Math.max(0, n))
             for (var i = 0; i < n; i++) accum[i] = iterator.call(context, i)
             return accum
-        },
+        }
 
 
-        /**
-         * @name _perichr_.Load
-         * @description 载入插件功能
-         * @param {Object} plugin 插件对象
-         */
-        Lo = P.Load = function(plugin) {
-            if (plugin) {
-                var key = plugin.id || (Prefix('noname') + Seed()),
-                    cache = {},
-                    getter = function(type) {
-                        type = type.toLocaleUpperCase()
-                        return function(key, b) {
-                            key = key.toLocaleLowerCase()
-                            return b ? cache[type][key] : _plugin_cache_[type][key]
-                        }
-                    },
-                    gsetter = function(type, callback) {
-                        type = type.toLocaleUpperCase()
-                        return function(key, value) {
-                            key = key.toLocaleLowerCase()
-                            if (value === undefined) {
-                                
-                                return cache[type][key] || _plugin_cache_[type][key]
-                            } else {
-                                cache[type][key] = value
-                                callback && callback(key, value)
+    /**
+     * @name _perichr_.Load
+     * @description 载入插件功能
+     * @param {Object} plugin 插件对象
+     */
+    function Lo(plugin) {
+        if (plugin) {
+            plugin.GetFullId = function() {
+                return myfullid
+            }
+            plugin.GetPath = function(id, key){
+                id = id || myid
+                key = key || mykey
+                return GetFullUrl(id, L[key])
+            }
+            plugin.GetPlugin = function(id, key) {
+                id = id || myid
+                key = key || mykey
+                return U[Lian(key, id)]
+            }
+            plugin.Load = function() {
+                var list = []
+                Each(arguments, function(index, argument){
+                    if(typeof argument == 'string') {
+                        argument = GetFullUrl(argument, L[mykey])
+                    } else if(IsArraylike(argument)) {
+                        Each(argument, function(index, value){
+                            if(typeof this == 'string') {
+                                argument[index] = GetFullUrl(value, L[mykey])
                             }
+                        })
+                    }
+                    argument && list.push(argument)
+                })
+                Loader.apply(null, list)
+                
+            }
+            var mykey = plugin.key || '',
+                myid = plugin.id || (Prefix('noname') + Seed()),
+                myfullid = Lian(mykey, myid),
+                cache = {},
+                getter = function(type) {
+                    type = type.toLocaleUpperCase()
+                    return function(name, b) {
+                        name = name.toLocaleLowerCase()
+                        return b ? cache[type][name] : _plugin_cache_[type][name]
+                    }
+                },
+                gsetter = function(type, callback) {
+                    type = type.toLocaleUpperCase()
+                    return function(name, value) {
+                        name = name.toLocaleLowerCase()
+                        if (value === undefined) {
+                            return cache[type][name] || _plugin_cache_[type][name]
+                        } else {
+                            cache[type][name] = value
+                            callback && callback(name, value)
                         }
                     }
-                U[key] = plugin
-                plugin.GetPlugin = function(key) {
-                    return key ? U[key] : plugin
                 }
-                plugin.GetOption = getter('option')
-                plugin.option = cache.OPTION = gsetter('option')
-                plugin.GetFn = getter('fn')
-                plugin.fn = cache.FN =gsetter('fn', function(name, func) {
-                    plugin.fn[name] = func || _fn_[name]
-                })
-                Each(_fn_, function(name, func) {
-                    plugin.fn[name] = func
-                })
-                plugin.Init && plugin.Init()
-            } else {
-                var script = Id(Prefix('js'))
-                if (!script) return
-                var datainit = script.getAttribute('data-init'),
-                    dataoptions = script.getAttribute('data-options')
-                _option_.jslib = GetFullUrl(script.src.replace(/(.+)perichr\.js$/, '$1')) 
-                if (dataoptions) {
+            U[myfullid] = plugin
+            plugin.GetOption = getter('option')
+            plugin.option = cache.OPTION = gsetter('option')
+            plugin.GetFn = getter('fn')
+            plugin.fn = cache.FN =gsetter('fn', function(name, func) {
+                plugin.fn[name] = func || _fn_[name]
+            })
+            Each(_fn_, function(name, func) {
+                plugin.fn[name] = func
+            })
+            plugin.Init && plugin.Init(plugin)
+        } else {
+            Each(Qa('script'), function() {
+                if(/\/perichr\.js$/.test(this.src)) {
+                    var key = Trim(this.getAttribute('data-PK') || '') 
+                    if(!L[key]) {
+                        L[key] = GetFullUrl(this.src.replace(/(.+)perichr\.js$/, '$1'))
+                    }
+                    var datainit = this.getAttribute('data-init') || 'p.js',
+                        dataoptions = this.getAttribute('data-options') || '{}'
+                    Rm(this)
                     Extend(_option_, JSON.parse(dataoptions))
-                }
-                if (datainit) {
                     var i = 0
                     datainit = datainit.split(',')
-                    Loader.apply(null, datainit)
+                    Each(datainit, function(index, value){
+                        datainit[index] = GetFullUrl(value, L[key])
+                    })
+                    Loader.apply(null, datainit)                        
                 }
-                Rm(script)
-            }
+            }, true)
         }
+    }
     /* 常用函数结束 */
 
     /* 初始化结束 */
@@ -590,17 +641,33 @@
     function Prefix(key) {
         return perichr + key + '_'
     }
+    //http://.. : http://..
+    //
     function GetFullUrl(url, base) {
-        if(/^(http:\/\/|\/)/.test(url)){
+        
+        if( 0 == url.indexOf('//') || /^([\w]+:\/\/|\/)/.test(url)) {
             return url
         }
         if(!base){
             base = window.location
             base = base.protocol + '//' + base.host + base.pathname    
         }
-        url = (base + '/' + url).replace(/([^:])[\/]+/g, '$1/')
+        url = (base + '/' + url).replace(/([^:\/])[\/]+/g, '$1/')
         return url
+    }
+    function Lian() {
+        var list = []
+        Each(arguments, function(){
+            this && list.push(this)
+
+        })
+        return list.join('_')
     }
     /* 预载的私有函数结束 */
 
-})(window, document, '_perichr_')
+})(window, 'P')
+
+
+
+
+
