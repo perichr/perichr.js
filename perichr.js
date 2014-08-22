@@ -146,8 +146,7 @@
             }
             if (_script_cache_[src]) {
                 return
-            } else{
-                if(/[\?&]callback=/.test(src)) return
+            } else if(!/[\?&]callback=/.test(src)){
                 _script_cache_[src] = s
             }
             setTimeout(function() {
@@ -158,12 +157,13 @@
                         script.onload = script.onreadystatechange = null
                         script.ready = true
                         run_callback()
-                        if (remove) {
-                        }
                     }
                 }
                 document.body.appendChild(script)
-                if(script.parentNode)script.parentNode.removeChild(script)
+                if (remove) {
+                    if(script.parentNode)script.parentNode.removeChild(script)
+                }
+                
             }, 0)
         },
 
@@ -177,6 +177,8 @@
             options.data._ = (new Date).valueOf()
             options.data.callback = options.data.callback || Seed('cb')
             options.url += ((/\?/).test(options.url) ? '&' : '?') + Serialize(options.data)
+            
+            
             root[options.data.callback] = function(data) {
                 options.success && options.success(data)
             }
