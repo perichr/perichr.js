@@ -1,6 +1,6 @@
 /** @license
  * @author <a href="mailto:i@perichr.org">perichr</a>
- * @version 1.1
+ * @version 1.1.2
  * @link http://perichr.org
  */
 
@@ -155,7 +155,7 @@
                 script.onload = script.onreadystatechange = function() {
                     if (!script.readyState || /loaded|complete/.test(script.readyState)) {
                         script.onload = script.onreadystatechange = null
-                        script.ready = true
+                        s.ready = true
                         run_callback()
                     }
                 }
@@ -668,8 +668,3 @@
     /* 预载的私有函数结束 */
 
 })(window, 'P')
-
-
-
-
-
