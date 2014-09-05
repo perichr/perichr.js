@@ -1,6 +1,6 @@
 /** @license
  * @author <a href="mailto:i@perichr.org">perichr</a>
- * @version 1.1.2
+ * @version 1.2
  * @link http://perichr.org
  */
 
@@ -24,6 +24,7 @@
         _plugin_cache_ = {}, //插件继承对象
         _fn_ = _plugin_cache_.FN = {}, //函数库
         _option_ = _plugin_cache_.OPTION = {}, //配置库
+        _jQuery_ = '//ajax.aspnetcdn.com/ajax/jQuery/jquery-1.10.2.min.js',
         
     /* 常用函数开始 */
     
@@ -70,6 +71,7 @@
          * @return {Boolean} result 结果
          */
         IsArraylike = _fn_.arraylike = F.IsArraylike = function(object) {
+            if(!object) return false
             var length = object.length,
                 type = typeof object
             if (/string|function/.test(type)) return false
@@ -290,17 +292,24 @@
          * @param {Object} childs 子节点集
          * @return {Element} result 结果
          */
-        El = _fn_.element = F.CreateElement = function(tag, attributes, childs) {
+        El = _fn_.element = F.CreateElement = function(tag, attributes, text, childs) {
             var element = document.createElement(tag)
             if (attributes) {
                 Each(attributes, function(key, value) {
                     Attr(element, key, value)
                 })
             }
+            if(IsArraylike(text)){
+                childs = text
+                text = null
+            }
+            if(text){
+                Txt(element, text)
+            }
             if (childs && childs.length>0) {
                 Each(childs, function() {
                     var settings = this
-                    Append(element, El(settings.tag, settings.attributes, settings.childs))
+                    Append(element, El(settings.tag, settings.attributes, settings.text, settings.childs))
                 })
             }
             return element
@@ -536,6 +545,22 @@
             var accum = Array(Math.max(0, n))
             for (var i = 0; i < n; i++) accum[i] = iterator.call(context, i)
             return accum
+        },
+        
+        $ = _fn_.$ = F.$ =function(iterator){
+            if(iterator == false){
+                delete _option_._jQuery_
+            } else if(typeof iterator == 'string'){
+                _option_._jQuery_ = iterator
+            } else if(typeof iterator == 'function'){
+                if(root.jQuery){
+                    iterator(root.jQuery)
+                } else {
+                    Loader(_option_._jQuery_ || _jQuery_, function(){
+                        iterator(root.jQuery)
+                    })
+                }
+            }
         }
 
 
@@ -574,7 +599,6 @@
                     argument && list.push(argument)
                 })
                 Loader.apply(null, list)
-                
             }
             var mykey = plugin.key || '',
                 myid = plugin.id || (Prefix('noname') + Seed()),
@@ -646,7 +670,6 @@
     //http://.. : http://..
     //
     function GetFullUrl(url, base) {
-        
         if( 0 == url.indexOf('//') || /^([\w]+:\/\/|\/)/.test(url)) {
             return url
         }
@@ -668,3 +691,8 @@
     /* 预载的私有函数结束 */
 
 })(window, 'P')
+
+
+
+
+
